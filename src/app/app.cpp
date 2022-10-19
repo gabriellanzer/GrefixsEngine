@@ -7,10 +7,8 @@
 //  - Uniform Buffer API
 //  - Textures API
 //   - Descriptor
-// - 
+// -
 // - Mesh Descriptor API
-
-
 
 // StdLib Includes
 #include <vector>
@@ -28,6 +26,7 @@
 
 // Application Specific Includes
 #include <app/app.h>
+#include <utils/spirv.h>
 
 // Using directives
 using std::string;
@@ -35,64 +34,60 @@ template <typename T>
 using vector = std::vector<T>;
 using std::ios;
 using std::istreambuf_iterator;
+using vk::ShaderStageFlagBits;
 
-static GLuint CompileShaderProgram(string vertex, string fragment)
+static bool TryLoadShaderFile(string shaderPath, string& outShaderData)
 {
-	string vdata;
-	string fdata;
-
-	bool vs = true;
-
-	//Load vertex
 	std::ifstream in;
-	in.open(vertex.c_str(), ios::in);
-	if (!in) {
-		vs = false;
+	in.open(shaderPath.c_str(), ios::in);
+	if (!in)
+	{
+		return false;
 	}
-	vdata.assign((istreambuf_iterator<char>(in)), istreambuf_iterator<char>());
+	outShaderData.assign((istreambuf_iterator<char>(in)), istreambuf_iterator<char>());
 	in.close();
+	return true;
+}
 
-	//load fragment
-	in.open(fragment.c_str(), ios::in);
-	if (!in) {
-		vs = false;
-	}
-	fdata.assign((istreambuf_iterator<char>(in)), istreambuf_iterator<char>());
-	in.close();
+static GLuint CompileShaderProgram(string vertData, string fragData)
+{
+	bool valid = !vertData.empty() && !fragData.empty();
 
-	//compile
+	// compile
 	const char* c_str;
 	uint32_t vid;
-	if (vs) {
+	if (valid)
+	{
 		vid = glCreateShader(GL_VERTEX_SHADER);
-		glShaderSource(vid, 1, &(c_str = vdata.c_str()), NULL);
+		glShaderSource(vid, 1, &(c_str = vertData.c_str()), NULL);
 		glCompileShader(vid);
 	}
 
 	uint32_t fid;
-	if (vs) {
+	if (valid)
+	{
 		fid = glCreateShader(GL_FRAGMENT_SHADER);
-		glShaderSource(fid, 1, &(c_str = fdata.c_str()), NULL);
+		glShaderSource(fid, 1, &(c_str = fragData.c_str()), NULL);
 		glCompileShader(fid);
 	}
 
-	//link
+	// link
 	uint32_t pid = glCreateProgram();
-	if (vs) glAttachShader(pid, vid);
-	if (vs) glAttachShader(pid, fid);
+	if (valid) glAttachShader(pid, vid);
+	if (valid) glAttachShader(pid, fid);
 	glLinkProgram(pid);
 
-	//log
+	// log
 	char logStr[1024];
 	glGetProgramInfoLog(pid, 1024, NULL, logStr);
 	fmt::print("Compile Shader Status: {0}\n", logStr);
 
-	//clean
-	if (vs) glDetachShader(pid, vid);
-	if (vs) glDetachShader(pid, fid);
+	// clean
+	if (valid) glDetachShader(pid, vid);
+	if (valid) glDetachShader(pid, fid);
 
-	if (vs) glDeleteShader(vid);
-	if (vs) glDeleteShader(fid);
+	if (valid) glDeleteShader(vid);
+	if (valid) glDeleteShader(fid);
 
 	return pid;
 }
@@ -137,12 +132,8 @@ void GrefixsEndine::Setup()
 	glBindBuffer(GL_ARRAY_BUFFER, vertexBufId);
 
 	float triangle[] = {
-		-0.5f, -0.5f, 0.0f,
-		+0.5f, -0.5f, 0.0f,
-		-0.5f, +0.5f, 0.0f,
-		-0.5f, +0.5f, 0.0f,
-		+0.5f, -0.5f, 0.0f,
-		+0.5f, +0.5f, 0.0f,
+		-0.5f, -0.5f, 0.0f, +0.5f, -0.5f, 0.0f, -0.5f, +0.5f, 0.0f,
+		-0.5f, +0.5f, 0.0f, +0.5f, -0.5f, 0.0f, +0.5f, +0.5f, 0.0f,
 	};
 
 	glBufferData(GL_ARRAY_BUFFER, sizeof(triangle), triangle, GL_STATIC_DRAW);
@@ -153,7 +144,18 @@ void GrefixsEndine::Setup()
 	glBindVertexArray(0);
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 
-	_exampleShader = CompileShaderProgram("../../shaders/vert_col.vs", "../../shaders/vert_col.fs");
+	// Shader Compilation
+	SpirvUtils::Init();
+
+	string vertData, fragData;
+	vector<unsigned int> vertSpirv, fragSpirv;
+	if (TryLoadShaderFile("../../shaders/vert_col.vs", vertData) &&
+		TryLoadShaderFile("../../shaders/vert_col.fs", fragData))
+	{
+		_exampleShader = CompileShaderProgram(vertData, fragData);
+		SpirvUtils::GLSLtoSPV(ShaderStageFlagBits::eVertex, vertData.c_str(), vertSpirv);
+		SpirvUtils::GLSLtoSPV(ShaderStageFlagBits::eFragment, fragData.c_str(), fragSpirv);
+	}
 }
 
 void GrefixsEndine::Awake() {}
@@ -162,6 +164,7 @@ void GrefixsEndine::Sleep() {}
 
 void GrefixsEndine::Shutdown()
 {
+	SpirvUtils::Finalize();
 
 	// Graphics API shutdown
 	glfwDestroyWindow(_window);
@@ -191,9 +194,9 @@ void GrefixsEndine::DrawAppScreen(double deltaTime)
 
 	const siv::PerlinNoise::seed_type seed = 123456u;
 
-	const siv::PerlinNoise perlin{ seed };
+	const siv::PerlinNoise perlin{seed};
 
-	glm::mat4 view = glm::lookAt(glm::vec3{ 0.0f, 0.0f, 5.0f }, glm::vec3{}, glm::vec3{ 0.0f, 1.0f, 0.0f });
+	glm::mat4 view = glm::lookAt(glm::vec3{0.0f, 0.0f, 5.0f}, glm::vec3{}, glm::vec3{0.0f, 1.0f, 0.0f});
 	glm::mat4 proj = glm::perspective(60.0f, 4 / 3.0f, 0.01f, 1000.0f);
 	glm::mat4 viewProj = proj * view;
 
@@ -208,8 +211,8 @@ void GrefixsEndine::DrawAppScreen(double deltaTime)
 			glUniform1f(3, perlinVal);
 
 			glm::mat4 model = glm::mat4(1.0f);
-			model = glm::translate(model, { x, y, 0.0f });
-			model = glm::rotate(model, perlinVal, glm::vec3{ 0.0f, 0.0f, 1.0f });
+			model = glm::translate(model, {x, y, 0.0f});
+			model = glm::rotate(model, perlinVal, glm::vec3{0.0f, 0.0f, 1.0f});
 			model = glm::scale(model, glm::vec3(0.5));
 
 			glUniformMatrix4fv(0, 1, false, &viewProj[0][0]);
@@ -219,6 +222,4 @@ void GrefixsEndine::DrawAppScreen(double deltaTime)
 			glDrawArrays(GL_TRIANGLES, 0, 6);
 		}
 	}
-
-
 }
