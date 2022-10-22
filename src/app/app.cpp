@@ -26,71 +26,12 @@
 
 // Application Specific Includes
 #include <app/app.h>
-#include <utils/spirv.h>
+#include <rendering/utils.h>
 
 // Using directives
 using std::string;
 template <typename T>
 using vector = std::vector<T>;
-using std::ios;
-using std::istreambuf_iterator;
-using vk::ShaderStageFlagBits;
-
-static bool TryLoadShaderFile(string shaderPath, string& outShaderData)
-{
-	std::ifstream in;
-	in.open(shaderPath.c_str(), ios::in);
-	if (!in)
-	{
-		return false;
-	}
-	outShaderData.assign((istreambuf_iterator<char>(in)), istreambuf_iterator<char>());
-	in.close();
-	return true;
-}
-
-static GLuint CompileShaderProgram(string vertData, string fragData)
-{
-	bool valid = !vertData.empty() && !fragData.empty();
-
-	// compile
-	const char* c_str;
-	uint32_t vid;
-	if (valid)
-	{
-		vid = glCreateShader(GL_VERTEX_SHADER);
-		glShaderSource(vid, 1, &(c_str = vertData.c_str()), NULL);
-		glCompileShader(vid);
-	}
-
-	uint32_t fid;
-	if (valid)
-	{
-		fid = glCreateShader(GL_FRAGMENT_SHADER);
-		glShaderSource(fid, 1, &(c_str = fragData.c_str()), NULL);
-		glCompileShader(fid);
-	}
-
-	// link
-	uint32_t pid = glCreateProgram();
-	if (valid) glAttachShader(pid, vid);
-	if (valid) glAttachShader(pid, fid);
-	glLinkProgram(pid);
-
-	// log
-	char logStr[1024];
-	glGetProgramInfoLog(pid, 1024, NULL, logStr);
-	fmt::print("Compile Shader Status: {0}\n", logStr);
-
-	// clean
-	if (valid) glDetachShader(pid, vid);
-	if (valid) glDetachShader(pid, fid);
-
-	if (valid) glDeleteShader(vid);
-	if (valid) glDeleteShader(fid);
-
-	return pid;
-}
 
 void GrefixsEndine::Setup()
 {
@@ -132,8 +73,12 @@ void GrefixsEndine::Setup()
 	glBindBuffer(GL_ARRAY_BUFFER, vertexBufId);
 
 	float triangle[] = {
-		-0.5f, -0.5f, 0.0f, +0.5f, -0.5f, 0.0f, -0.5f, +0.5f, 0.0f,
-		-0.5f, +0.5f, 0.0f, +0.5f, -0.5f, 0.0f, +0.5f, +0.5f, 0.0f,
+		-0.5f, -0.5f, 0.0f, // v0
+		+0.5f, -0.5f, 0.0f, // v1
+		-0.5f, +0.5f, 0.0f, // v2
+		-0.5f, +0.5f, 0.0f, // v3
+		+0.5f, -0.5f, 0.0f, // v4
+		+0.5f, +0.5f, 0.0f, // v5
 	};
 
 	glBufferData(GL_ARRAY_BUFFER, sizeof(triangle), triangle, GL_STATIC_DRAW);
@@ -145,16 +90,17 @@ void GrefixsEndine::Setup()
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 
 	// Shader Compilation
-	SpirvUtils::Init();
+	ShaderUtils::Init();
 
 	string vertData, fragData;
 	vector<unsigned int> vertSpirv, fragSpirv;
-	if (TryLoadShaderFile("../../shaders/vert_col.vs", vertData) &&
-		TryLoadShaderFile("../../shaders/vert_col.fs", fragData))
+	if (ShaderUtils::TryLoadShaderFile("../../shaders/vert_col.vs", vertData) &&
+		ShaderUtils::TryLoadShaderFile("../../shaders/vert_col.fs", fragData))
 	{
-		_exampleShader = CompileShaderProgram(vertData, fragData);
-		SpirvUtils::GLSLtoSPV(ShaderStageFlagBits::eVertex, vertData.c_str(), vertSpirv);
-		SpirvUtils::GLSLtoSPV(ShaderStageFlagBits::eFragment, fragData.c_str(), fragSpirv);
+		// _exampleShader = CompileShaderProgramTxt(vertData, fragData);
+		ShaderUtils::GLSLtoSPV(vk::ShaderStageFlagBits::eVertex, vertData.c_str(), vertSpirv);
+		ShaderUtils::GLSLtoSPV(vk::ShaderStageFlagBits::eFragment, fragData.c_str(), fragSpirv);
+		_exampleShader = ShaderUtils::CompileShaderProgramSpirV(vertSpirv, fragSpirv);
 	}
 }
 
@@ -164,7 +110,7 @@ void GrefixsEndine::Sleep() {}
 
 void GrefixsEndine::Shutdown()
 {
-	SpirvUtils::Finalize();
+	ShaderUtils::Finalize();
 
 	// Graphics API shutdown
 	glfwDestroyWindow(_window);
@@ -189,8 +135,8 @@ void GrefixsEndine::Update(double deltaTime)
 
 void GrefixsEndine::DrawAppScreen(double deltaTime)
 {
-	static double accTime = 0.0;
-	accTime += deltaTime;
+	static float accTime = 0.0f;
+	accTime += (float)deltaTime;
 
 	const siv::PerlinNoise::seed_type seed = 123456u;
 
@@ -204,7 +150,7 @@ void GrefixsEndine::DrawAppScreen(double deltaTime)
 	{
 		for (int y = -50; y < 50; y++)
 		{
-			const float perlinVal = perlin.octave2D(x + cos(accTime), y + sin(accTime), 2);
+			const float perlinVal = (float)perlin.octave2D(x + cos(accTime), y + sin(accTime), 2);
 
 			glUseProgram(_exampleShader);
 			glUniform1f(2, accTime);

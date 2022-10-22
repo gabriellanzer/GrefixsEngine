@@ -12,8 +12,7 @@
 class GrefixsEndine : public gefx::IApp
 {
   public:
-	GrefixsEndine()
-		: gefx::IApp("Grefixs") {};
+	GrefixsEndine() : gefx::IApp("Grefixs"){};
 	~GrefixsEndine() override = default;
 	GrefixsEndine(GrefixsEndine&&) = delete;
 	GrefixsEndine(const GrefixsEndine&) = delete;
@@ -42,7 +41,6 @@ class GrefixsEndine : public gefx::IApp
 
 	GLuint _exampleVAO;
 	GLuint _exampleShader;
-
 };
 
 #endif //!__APP__H__

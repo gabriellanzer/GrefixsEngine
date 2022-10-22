@@ -1,16 +1,28 @@
-// Dependencies
+// StdLib Dependencies
+#include <fstream>
+#include <iostream>
+
+// Third Party Dependencies
 #include <fmt/core.h>
-#include <glslang/SPIRV/GlslangToSpv.h>
-#include <ostream>
+#include <glad/glad.h>
 #include <vulkan/vulkan.hpp>
+#include <glslang/SPIRV/GlslangToSpv.h>
+#include <glslang/SPIRV/disassemble.h>
 
-namespace SpirvUtils
+// Using directives
+using std::string;
+template <typename T>
+using vector = std::vector<T>;
+using std::istreambuf_iterator;
+
+// TODO: Move this to proper Graphics API abstraction
+namespace ShaderUtils
 {
-	static void Init() { glslang::InitializeProcess(); }
+	inline void Init() { glslang::InitializeProcess(); }
 
-	static void Finalize() { glslang::FinalizeProcess(); }
+	inline void Finalize() { glslang::FinalizeProcess(); }
 
-	static void InitResources(TBuiltInResource& rsc)
+	inline void InitResources(TBuiltInResource& rsc)
 	{
 		rsc.maxLights = 32;
 		rsc.maxClipPlanes = 6;
@@ -115,7 +127,7 @@ namespace SpirvUtils
 		rsc.limits.generalConstantMatrixVectorIndexing = 1;
 	}
 
-	static const char* VkShaderTypeToStr(const vk::ShaderStageFlagBits shaderType)
+	inline const char* VkShaderTypeToStr(const vk::ShaderStageFlagBits shaderType)
 	{
 		switch (shaderType)
 		{
@@ -153,7 +165,7 @@ namespace SpirvUtils
 		}
 	}
 
-	static EShLanguage FindLanguage(const vk::ShaderStageFlagBits shaderType)
+	inline EShLanguage FindLanguage(const vk::ShaderStageFlagBits shaderType)
 	{
 		switch (shaderType)
 		{
@@ -191,7 +203,7 @@ namespace SpirvUtils
 		}
 	}
 
-	static bool GLSLtoSPV(const vk::ShaderStageFlagBits shaderType, const char* shaderStr,
+	inline bool GLSLtoSPV(const vk::ShaderStageFlagBits shaderType, const char* shaderStr,
 						  std::vector<unsigned int>& spirv)
 	{
 		EShLanguage stage = FindLanguage(shaderType);
@@ -229,9 +241,206 @@ namespace SpirvUtils
 			return false;
 		}
 
-		glslang::GlslangToSpv(*program.getIntermediate(stage), spirv);
+		glslang::SpvOptions options = {};
+		options.validate = true;
+		glslang::GlslangToSpv(*program.getIntermediate(stage), spirv, &options);
 		fmt::print("GLSL to SPIR-V compilation succeded! Stage: {0}\n", VkShaderTypeToStr(shaderType));
+
+		// Dump Disassemble:
+		// spv::Disassemble(std::cout, spirv);
+
 		fflush(stdout);
 		return true;
 	}
-}; // namespace SpirvUtils
+
+	inline bool TryLoadShaderFile(string shaderPath, string& outShaderData)
+	{
+		std::ifstream in;
+		in.open(shaderPath.c_str(), std::ios::in);
+		if (!in)
+		{
+			return false;
+		}
+		outShaderData.assign((istreambuf_iterator<char>(in)), istreambuf_iterator<char>());
+		in.close();
+		return true;
+	}
+
+	inline GLuint CompileShaderProgramTxt(string vertTxtData, string fragTxtData)
+	{
+		char logStr[1024];
+		int resultCode = 0;
+		bool valid = !vertTxtData.empty() && !fragTxtData.empty();
+
+		// compile
+		const char* c_str;
+		uint32_t vid;
+		if (valid)
+		{
+			vid = glCreateShader(GL_VERTEX_SHADER);
+			glShaderSource(vid, 1, &(c_str = vertTxtData.c_str()), NULL);
+			glCompileShader(vid);
+
+			glGetShaderiv(vid, GL_COMPILE_STATUS, &resultCode);
+			if (resultCode == GL_FALSE)
+			{
+				glGetShaderInfoLog(vid, 1024, NULL, logStr);
+				fmt::print("[OpenGL] Vertex Shader - Compile Error:\n{0}\n", logStr);
+				glDeleteShader(vid);
+				fflush(stdout);
+				return 0;
+			}
+			else
+			{
+				fmt::print("[OpenGL] Vertex Shader - Compiled Successfully!\n");
+			}
+			fflush(stdout);
+		}
+
+		uint32_t fid;
+		if (valid)
+		{
+			fid = glCreateShader(GL_FRAGMENT_SHADER);
+			glShaderSource(fid, 1, &(c_str = fragTxtData.c_str()), NULL);
+			glCompileShader(fid);
+
+			glGetShaderiv(fid, GL_COMPILE_STATUS, &resultCode);
+			if (resultCode == GL_FALSE)
+			{
+				glGetShaderInfoLog(fid, 1024, NULL, logStr);
+				fmt::print("[OpenGL] Fragment Shader - Compile Error:\n{0}\n", logStr);
+				glDeleteShader(vid);
+				glDeleteShader(fid);
+				fflush(stdout);
+				return 0;
+			}
+			else
+			{
+				fmt::print("[OpenGL] Fragment Shader - Compiled Successfully!\n");
+			}
+		}
+
+		// link
+		uint32_t pid = glCreateProgram();
+		if (valid) glAttachShader(pid, vid);
+		if (valid) glAttachShader(pid, fid);
+		glLinkProgram(pid);
+
+		// log
+		glGetProgramInfoLog(pid, 1024, NULL, logStr);
+
+		glGetProgramiv(pid, GL_LINK_STATUS, &resultCode);
+		if (resultCode == GL_FALSE)
+		{
+			glGetProgramInfoLog(pid, 1024, NULL, logStr);
+			fmt::print("[OpenGL] Shader Program - Link Error:\n{0}\n", logStr);
+			glDeleteShader(vid);
+			glDeleteShader(fid);
+			glDeleteProgram(pid);
+			fflush(stdout);
+			return 0;
+		}
+		else
+		{
+			fmt::print("[OpenGL] Shader Program - Linked Successfully!\n");
+		}
+
+		// clean
+		if (valid) glDetachShader(pid, vid);
+		if (valid) glDetachShader(pid, fid);
+
+		if (valid) glDeleteShader(vid);
+		if (valid) glDeleteShader(fid);
+
+		fflush(stdout);
+		return pid;
+	}
+
+	inline GLuint CompileShaderProgramSpirV(const vector<unsigned int>& vertSpirVData,
+											const vector<unsigned int>& fragSpirVData)
+	{
+		char logStr[1024];
+		int resultCode = 0;
+		bool valid = !vertSpirVData.empty() && !fragSpirVData.empty();
+
+		// compile
+		uint32_t vid = 0;
+		if (valid)
+		{
+			vid = glCreateShader(GL_VERTEX_SHADER);
+			const int vertDataBytesSize = static_cast<int>(vertSpirVData.size() * sizeof(unsigned int));
+			glShaderBinary(1, &vid, GL_SHADER_BINARY_FORMAT_SPIR_V_ARB, vertSpirVData.data(), vertDataBytesSize);
+			glSpecializeShader(vid, "main", 0, nullptr, nullptr);
+
+			glGetShaderiv(vid, GL_COMPILE_STATUS, &resultCode);
+			if (resultCode == GL_FALSE)
+			{
+				glGetShaderInfoLog(vid, 1024, NULL, logStr);
+				fmt::print("[Spir-V] Vertex Shader - Compile Error:\n{0}\n", logStr);
+				glDeleteShader(vid);
+				fflush(stdout);
+				return 0;
+			}
+			else
+			{
+				fmt::print("[Spir-V] Vertex Shader - Compiled Successfully!\n");
+			}
+		}
+
+		uint32_t fid = 0;
+		if (valid)
+		{
+			fid = glCreateShader(GL_FRAGMENT_SHADER);
+			const int fragDataBytesSize = static_cast<int>(fragSpirVData.size() * sizeof(unsigned int));
+			glShaderBinary(1, &fid, GL_SHADER_BINARY_FORMAT_SPIR_V_ARB, fragSpirVData.data(), fragDataBytesSize);
+			glSpecializeShader(fid, "main", 0, nullptr, nullptr);
+
+			glGetShaderiv(fid, GL_COMPILE_STATUS, &resultCode);
+			if (resultCode == GL_FALSE)
+			{
+				glGetShaderInfoLog(fid, 1024, NULL, logStr);
+				fmt::print("[Spir-V] Fragment Shader - Compile Error:\n{0}\n", logStr);
+				glDeleteShader(vid);
+				glDeleteShader(fid);
+				fflush(stdout);
+				return 0;
+			}
+			else
+			{
+				fmt::print("[Spir-V] Fragment Shader - Compiled Successfully!\n");
+			}
+		}
+
+		// link
+		uint32_t pid = glCreateProgram();
+		if (valid) glAttachShader(pid, vid);
+		if (valid) glAttachShader(pid, fid);
+		glLinkProgram(pid);
+
+		glGetProgramiv(pid, GL_LINK_STATUS, &resultCode);
+		if (resultCode == GL_FALSE)
+		{
+			glGetProgramInfoLog(pid, 1024, NULL, logStr);
+			fmt::print("[Spir-V] Shader Program - Link Error:\n{0}\n", logStr);
+			glDeleteShader(vid);
+			glDeleteShader(fid);
+			glDeleteProgram(pid);
+			fflush(stdout);
+			return 0;
+		}
+		else
+		{
+			fmt::print("[Spir-V] Shader Program - Linked Successfully!\n");
+		}
+
+		// clean
+		if (valid) glDetachShader(pid, vid);
+		if (valid) glDetachShader(pid, fid);
+
+		if (valid) glDeleteShader(vid);
+		if (valid) glDeleteShader(fid);
+
+		fflush(stdout);
+		return pid;
+	}
+} // namespace ShaderUtils
