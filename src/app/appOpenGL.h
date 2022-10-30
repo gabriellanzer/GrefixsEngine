@@ -9,15 +9,15 @@
 
 #include <core/iapp.h>
 
-class GrefixsEndine : public gefx::IApp
+class OpenGL_App : public gefx::IApp
 {
   public:
-	GrefixsEndine() : gefx::IApp("Grefixs"){};
-	~GrefixsEndine() override = default;
-	GrefixsEndine(GrefixsEndine&&) = delete;
-	GrefixsEndine(const GrefixsEndine&) = delete;
-	GrefixsEndine& operator=(GrefixsEndine&&) = delete;
-	GrefixsEndine& operator=(const GrefixsEndine&) = delete;
+	OpenGL_App() : gefx::IApp("Grefixs OpenGL"){};
+	~OpenGL_App() override = default;
+	OpenGL_App(OpenGL_App&&) = delete;
+	OpenGL_App(const OpenGL_App&) = delete;
+	OpenGL_App& operator=(OpenGL_App&&) = delete;
+	OpenGL_App& operator=(const OpenGL_App&) = delete;
 
 	void Awake() override;
 	void Setup() override;
