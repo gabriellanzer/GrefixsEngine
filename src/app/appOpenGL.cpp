@@ -1,15 +1,4 @@
 
-// TODOs:
-// - Spir-V
-//  - Compile and Run
-//  - Reflection
-// - Shader Manager (look reference code - twitter)
-//  - Uniform Buffer API
-//  - Textures API
-//   - Descriptor
-// -
-// - Mesh Descriptor API
-
 // StdLib Includes
 #include <vector>
 #include <string>

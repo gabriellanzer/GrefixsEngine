@@ -1,4 +1,14 @@
 
+// TODOs:
+// - 
+// - Spir-V
+//  - Reflection
+// - Shader Manager (look reference code - twitter)
+//  - Uniform Buffer API
+//  - Textures API
+//   - Descriptor
+// - Mesh Descriptor API
+
 // Hide Console Window
 // #pragma comment(linker, "/SUBSYSTEM:windows /ENTRY:mainCRTStartup")
 

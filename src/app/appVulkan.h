@@ -63,6 +63,7 @@ class Vulkan_App : public gefx::IApp
 	void CreateSwapChainImageViews();
 	void CreateRenderPass();
 	void CreateFramebuffers();
+	void CreateGraphicsPipeline(VkShaderModule vertModule, VkShaderModule fragModule);
 	void CreateCommandPool();
 	void CreateCommandBuffers();
 	void CreateSyncObjects();
@@ -109,6 +110,7 @@ class Vulkan_App : public gefx::IApp
 	// =================
 	VkRenderPass _renderPass;
 	VkPipelineLayout _pipelineLayout;
+	VkPipeline _graphicsPipeline;
 	VkCommandPool _commandPool;
 	vector<VkCommandBuffer> _commandBuffers;
 

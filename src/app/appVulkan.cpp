@@ -1,15 +1,4 @@
 
-// TODOs:
-// - Spir-V
-//  - Compile and Run
-//  - Reflection
-// - Shader Manager (look reference code - twitter)
-//  - Uniform Buffer API
-//  - Textures API
-//   - Descriptor
-// -
-// - Mesh Descriptor API
-
 // StdLib Includes
 #include <stdexcept>
 #include <stdint.h>
@@ -103,7 +92,6 @@ void Vulkan_App::Setup()
 	CreateSwapChain();
 	CreateSwapChainImageViews();
 	CreateRenderPass();
-	// TODO: Create Graphics Pipeline Here
 	CreateFramebuffers();
 	CreateCommandPool();
 	CreateCommandBuffers();
@@ -124,6 +112,13 @@ void Vulkan_App::Setup()
 			VK_SHADER_STAGE_VERTEX_BIT, vertData.c_str(), vertSpirv, RenderUtils::ShaderCompileTarget::Vulkan);
 		RenderUtils::GLSLtoSPV(
 			VK_SHADER_STAGE_FRAGMENT_BIT, fragData.c_str(), fragSpirv, RenderUtils::ShaderCompileTarget::Vulkan);
+		VkShaderModule vertModule = RenderUtils::Vulkan::CreateShaderModule(_device, vertSpirv);
+		VkShaderModule fragModule = RenderUtils::Vulkan::CreateShaderModule(_device, fragSpirv);
+
+		CreateGraphicsPipeline(vertModule, fragModule);
+
+		vkDestroyShaderModule(_device, vertModule, nullptr);
+		vkDestroyShaderModule(_device, fragModule, nullptr);
 	}
 
 	fmt::print("Vulkan App Setup Finished");
@@ -139,6 +134,9 @@ void Vulkan_App::Shutdown()
 
 	// Wait for device to become idle before cleaning resources
 	vkDeviceWaitIdle(_device);
+
+	vkDestroyPipeline(_device, _graphicsPipeline, nullptr);
+	vkDestroyPipelineLayout(_device, _pipelineLayout, nullptr);
 
 	CleanupSwapChain();
 
@@ -594,6 +592,26 @@ void Vulkan_App::CreateFramebuffers()
 	}
 }
 
+void Vulkan_App::CreateGraphicsPipeline(VkShaderModule vertModule, VkShaderModule fragModule)
+{
+
+	VkPipelineLayoutCreateInfo pipelineLayoutInfo = {};
+	pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+	pipelineLayoutInfo.setLayoutCount = 0;			  // Optional
+	pipelineLayoutInfo.pSetLayouts = nullptr;		  // Optional
+	pipelineLayoutInfo.pushConstantRangeCount = 0;	  // Optional
+	pipelineLayoutInfo.pPushConstantRanges = nullptr; // Optional
+
+	if (vkCreatePipelineLayout(_device, &pipelineLayoutInfo, nullptr, &_pipelineLayout) != VK_SUCCESS)
+	{
+		fmt::print("Failed to create pipeline layout!");
+		return;
+	}
+
+	_graphicsPipeline = RenderUtils::Vulkan::CreateDefaultRenderPipeline(
+		_device, _renderPass, _pipelineLayout, _surfaceExtent, vertModule, fragModule);
+}
+
 void Vulkan_App::CreateCommandPool()
 {
 	VkCommandPoolCreateInfo poolInfo = {};
@@ -710,6 +728,24 @@ void Vulkan_App::RecordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t ima
 	renderPassInfo.pClearValues = &clearColor;
 
 	vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+
+	vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, _graphicsPipeline);
+
+	VkViewport viewport{};
+	viewport.x = 0.0f;
+	viewport.y = 0.0f;
+	viewport.width = static_cast<float>(_surfaceExtent.width);
+	viewport.height = static_cast<float>(_surfaceExtent.height);
+	viewport.minDepth = 0.0f;
+	viewport.maxDepth = 1.0f;
+	vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
+
+	VkRect2D scissor{};
+	scissor.offset = {0, 0};
+	scissor.extent = _surfaceExtent;
+	vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
+
+	vkCmdDraw(commandBuffer, 3, 1, 0, 0);
 
 	vkCmdEndRenderPass(commandBuffer);
 
