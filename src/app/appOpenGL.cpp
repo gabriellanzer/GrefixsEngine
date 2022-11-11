@@ -108,7 +108,11 @@ void OpenGL_App::Shutdown()
 
 void OpenGL_App::Update(double deltaTime)
 {
-	shouldQuit = glfwWindowShouldClose(_window);
+	if (glfwWindowShouldClose(_window))
+	{
+		_shouldQuit = true;
+		return;
+	}
 
 	// Poll first so ImGUI has the events.
 	// This performs some callbacks as well

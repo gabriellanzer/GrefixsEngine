@@ -11,8 +11,8 @@ namespace gefx
 
 	  public:
 		constexpr explicit IApp(const char* name)
-			: name(name), sleeping(false), deltaTime(0.016), shouldSleep(false), shouldWakeUp(true),
-			  shouldQuit(false){};
+			: _shouldSleep(false), _shouldWakeUp(true), _shouldQuit(false), name(name), _sleeping(false),
+			  _deltaTime(0.016){};
 		virtual ~IApp() = default;
 
 		void Run();
@@ -31,48 +31,48 @@ namespace gefx
 		virtual void Sleep() = 0;
 		virtual void Shutdown() = 0;
 
-		bool shouldSleep;
-		bool shouldWakeUp;
-		bool shouldQuit;
+		bool _shouldSleep;
+		bool _shouldWakeUp;
+		bool _shouldQuit;
 
 	  private:
 		const char* name;
-		bool sleeping;
-		double deltaTime;
+		bool _sleeping;
+		double _deltaTime;
 	};
 
 	inline void IApp::Run()
 	{
 		Setup();
-		while (!shouldQuit)
+		while (!_shouldQuit)
 		{
-			if (sleeping)
+			if (_sleeping)
 			{
-				if (shouldWakeUp)
+				if (_shouldWakeUp)
 				{
-					sleeping = false;
-					shouldWakeUp = false;
+					_sleeping = false;
+					_shouldWakeUp = false;
 					Awake();
 					continue;
 				}
 			}
 			else
 			{
-				if (shouldSleep)
+				if (_shouldSleep)
 				{
 					Sleep();
-					sleeping = true;
-					shouldSleep = false;
+					_sleeping = true;
+					_shouldSleep = false;
 					continue;
 				}
 			}
 
 			highResClock::time_point start = highResClock::now();
-			Update(deltaTime);
+			Update(_deltaTime);
 			highResClock::time_point stop = highResClock::now();
 
 			using ms = std::chrono::duration<double>;
-			deltaTime = std::chrono::duration_cast<ms>(stop - start).count();
+			_deltaTime = std::chrono::duration_cast<ms>(stop - start).count();
 		}
 		Shutdown();
 	}

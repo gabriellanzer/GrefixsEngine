@@ -132,9 +132,6 @@ void Vulkan_App::Shutdown()
 {
 	fmt::print("Vulkan App Setup Shutdown");
 
-	// Wait for device to become idle before cleaning resources
-	vkDeviceWaitIdle(_device);
-
 	vkDestroyPipeline(_device, _graphicsPipeline, nullptr);
 	vkDestroyPipelineLayout(_device, _pipelineLayout, nullptr);
 
@@ -165,7 +162,15 @@ void Vulkan_App::Shutdown()
 
 void Vulkan_App::Update(double deltaTime)
 {
-	shouldQuit = glfwWindowShouldClose(_window);
+	if (glfwWindowShouldClose(_window))
+	{
+		_shouldQuit = true;
+
+		// Wait for device to become idle before shutting down
+		// this is required because of resource cleaning
+		vkDeviceWaitIdle(_device);
+		return;
+	}
 
 	// Poll first so ImGUI has the events.
 	// This performs some callbacks as well
