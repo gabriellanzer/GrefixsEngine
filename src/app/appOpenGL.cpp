@@ -1,21 +1,11 @@
 
-// TODOs:
-// - Spir-V
-//  - Compile and Run
-//  - Reflection
-// - Shader Manager (look reference code - twitter)
-//  - Uniform Buffer API
-//  - Textures API
-//   - Descriptor
-// -
-// - Mesh Descriptor API
-
 // StdLib Includes
 #include <vector>
 #include <string>
 #include <fstream>
 
 // Third Party Includes
+#include <volk.h>
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
 #include <fmt/core.h>
@@ -25,15 +15,15 @@
 #include <glm/gtc/matrix_transform.hpp>
 
 // Application Specific Includes
-#include <app/app.h>
-#include <rendering/utils.h>
+#include <app/appOpenGL.h>
+#include <render/utilsOpenGL.h>
 
 // Using directives
 using std::string;
 template <typename T>
 using vector = std::vector<T>;
 
-void GrefixsEndine::Setup()
+void OpenGL_App::Setup()
 {
 	// Setup Graphics APIs
 	glfwSetErrorCallback(OnGlfwErrorCallback);
@@ -90,34 +80,33 @@ void GrefixsEndine::Setup()
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 
 	// Shader Compilation
-	ShaderUtils::Init();
+	RenderUtils::InitGlslang();
 
 	string vertData, fragData;
 	vector<unsigned int> vertSpirv, fragSpirv;
-	if (ShaderUtils::TryLoadShaderFile("../../shaders/vert_col.vs", vertData) &&
-		ShaderUtils::TryLoadShaderFile("../../shaders/vert_col.fs", fragData))
+	if (RenderUtils::TryLoadShaderFile("../../shaders/vert_col_gl.vs", vertData) &&
+		RenderUtils::TryLoadShaderFile("../../shaders/vert_col_gl.fs", fragData))
 	{
-		// _exampleShader = CompileShaderProgramTxt(vertData, fragData);
-		ShaderUtils::GLSLtoSPV(vk::ShaderStageFlagBits::eVertex, vertData.c_str(), vertSpirv);
-		ShaderUtils::GLSLtoSPV(vk::ShaderStageFlagBits::eFragment, fragData.c_str(), fragSpirv);
-		_exampleShader = ShaderUtils::CompileShaderProgramSpirV(vertSpirv, fragSpirv);
+		RenderUtils::GLSLtoSPV(VK_SHADER_STAGE_VERTEX_BIT, vertData.c_str(), vertSpirv, RenderUtils::ShaderCompileTarget::OpenGL);
+		RenderUtils::GLSLtoSPV(VK_SHADER_STAGE_FRAGMENT_BIT, fragData.c_str(), fragSpirv, RenderUtils::ShaderCompileTarget::OpenGL);
+		_exampleShader = RenderUtils::OpenGL::CompileShaderProgramSpirV(vertSpirv, fragSpirv);
 	}
 }
 
-void GrefixsEndine::Awake() {}
+void OpenGL_App::Awake() {}
 
-void GrefixsEndine::Sleep() {}
+void OpenGL_App::Sleep() {}
 
-void GrefixsEndine::Shutdown()
+void OpenGL_App::Shutdown()
 {
-	ShaderUtils::Finalize();
+	RenderUtils::FinalizeGlslang();
 
 	// Graphics API shutdown
 	glfwDestroyWindow(_window);
 	glfwTerminate();
 }
 
-void GrefixsEndine::Update(double deltaTime)
+void OpenGL_App::Update(double deltaTime)
 {
 	shouldQuit = glfwWindowShouldClose(_window);
 
@@ -133,7 +122,7 @@ void GrefixsEndine::Update(double deltaTime)
 	glfwSwapBuffers(_window);
 }
 
-void GrefixsEndine::DrawAppScreen(double deltaTime)
+void OpenGL_App::DrawAppScreen(double deltaTime)
 {
 	static float accTime = 0.0f;
 	accTime += (float)deltaTime;
