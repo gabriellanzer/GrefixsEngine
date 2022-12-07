@@ -7,6 +7,7 @@
 #include <string>
 #include <fstream>
 #include <optional>
+#include <array>
 #include <set>
 
 // Third Party Includes
@@ -36,6 +37,10 @@ template <typename T>
 using optional = std::optional<T>;
 template <typename T>
 using set = std::set<T>;
+template <typename T, int TSize>
+using array = std::array<T, TSize>;
+
+using namespace RenderUtils::Vulkan;
 
 void Vulkan_App::Setup()
 {
@@ -120,6 +125,11 @@ void Vulkan_App::Setup()
 		vkDestroyShaderModule(_device, vertModule, nullptr);
 		vkDestroyShaderModule(_device, fragModule, nullptr);
 	}
+	else
+	{
+		fmt::print("Failed to Load Shader Files!");
+		fflush(stdout);
+	}
 
 	fmt::print("Vulkan App Setup Finished");
 }
@@ -177,6 +187,8 @@ void Vulkan_App::Update(double deltaTime)
 	glfwPollEvents();
 
 	DrawVulkanFrame(deltaTime);
+
+	fflush(stdout);
 }
 
 void Vulkan_App::GetRequiredAPIExtensions(vector<const char*>& outExtensions)
@@ -669,6 +681,29 @@ void Vulkan_App::CreateSyncObjects()
 			throw std::runtime_error("Failed to create synchronization objects for a frame!");
 		}
 	}
+}
+
+void Vulkan_App::CreateVertexBuffer()
+{
+	const float quad[] = {
+		-0.5f, -0.5f, 0.0f, // v0
+		+0.5f, -0.5f, 0.0f, // v1
+		-0.5f, +0.5f, 0.0f, // v2
+		-0.5f, +0.5f, 0.0f, // v3
+		+0.5f, -0.5f, 0.0f, // v4
+		+0.5f, +0.5f, 0.0f, // v5
+	};
+
+	VkVertexInputBindingDescription bindingDescription = {};
+	bindingDescription.binding = 0;
+	bindingDescription.stride = sizeof(float) * 3 /*3D Position*/ * 6 /*2 triangles*/;
+	bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+
+	array<VkVertexInputAttributeDescription, 1> attributeDescriptions = {};
+	attributeDescriptions[0].binding = 0;
+	attributeDescriptions[0].location = 0;
+	attributeDescriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;
+	attributeDescriptions[0].offset = 0; // offsetof(Vertex, pos);
 }
 
 void Vulkan_App::CleanupSwapChain()

@@ -62,7 +62,7 @@ void OpenGL_App::Setup()
 
 	glBindBuffer(GL_ARRAY_BUFFER, vertexBufId);
 
-	float triangle[] = {
+	const float quad[] = {
 		-0.5f, -0.5f, 0.0f, // v0
 		+0.5f, -0.5f, 0.0f, // v1
 		-0.5f, +0.5f, 0.0f, // v2
@@ -71,7 +71,7 @@ void OpenGL_App::Setup()
 		+0.5f, +0.5f, 0.0f, // v5
 	};
 
-	glBufferData(GL_ARRAY_BUFFER, sizeof(triangle), triangle, GL_STATIC_DRAW);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(quad), quad, GL_STATIC_DRAW);
 
 	glEnableVertexAttribArray(0);
 	glVertexAttribPointer(0, 3, GL_FLOAT, false, sizeof(float) * 3, 0);

@@ -14,7 +14,8 @@
 #include <render/utilsVulkan.h>
 
 // Using directives
-using namespace RenderUtils::Vulkan;
+using RenderUtils::Vulkan::QueueFamilyIndices;
+using RenderUtils::Vulkan::SwapChainSupportDetails;
 
 class Vulkan_App : public gefx::IApp
 {
@@ -67,6 +68,7 @@ class Vulkan_App : public gefx::IApp
 	void CreateCommandPool();
 	void CreateCommandBuffers();
 	void CreateSyncObjects();
+	void CreateVertexBuffer();
 
 	void CleanupSwapChain();
 	void RecreateSwapChain();

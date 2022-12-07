@@ -1,7 +1,6 @@
 #version 450
 #define VULKAN 100
 
-layout(location = 0) in vec3 fragColor;
 layout(location = 0) out vec4 color;
 
 // layout(binding = 0, set=0) uniform FUBO {
@@ -17,5 +16,5 @@ layout(location = 0) out vec4 color;
 
 
 void main() {
-    color = vec4(fragColor, 1.0);
+    color = vec4(1.0f, 0.7f, 0.5f, 1.0f);
 }
